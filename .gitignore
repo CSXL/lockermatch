@@ -1,0 +1,12 @@
+# Secrets that we don't want to leak ;)
+.env
+.env.local
+.env.test
+.env.development
+.env.production
+
+# Trunk
+.trunk/
+
+# Student data
+.csv
