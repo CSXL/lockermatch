@@ -42,3 +42,15 @@ We also will ensure that the application is SOPIPA compliant, FERPA compliant, a
 - SOPIPA & FERPA: Record management, we'll encrypt with FIPS-compliant ciphers, and we'll use RBAC to manage access to the data.
 - Authentication: OTP based system with Active Directory.
 - Authorization: RBAC with JWT tokens.
+
+## User Experience (UX)
+
+This section contains diagrams that show the abstract user experience of the application. It doesn't contain technical details or interface design, but rather the overall experience of the application.
+
+![Authentication UX Diagram](./docs/ux/authentication.png)
+
+![Student UX Diagram](./docs/ux/student.png)
+
+![Staff UX Diagram](./docs/ux/staff.png)
+
+![Admin UX Diagram](./docs/ux/admin.png)
