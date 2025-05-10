@@ -1,11 +1,9 @@
-use backend::router::create_router;
+use anyhow::Context;
+use backend::http;
 
 #[tokio::main]
-async fn main() {
-    // build our application with a single route
-    let app = create_router();
+async fn main() -> Result<(), anyhow::Error> {
+    http::serve().await?;
 
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    Ok(())
 }
