@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json},
 };
+use log::{debug, error};
 use serde_json::json;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -70,6 +71,14 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         let status = self.status_code();
+
+        match &self {
+            Error::Unauthorized => debug!("Unauthorized request: {}", self),
+            Error::Forbidden => debug!("Forbidden request: {}", self),
+            Error::NotFound => debug!("Not found: {}", self),
+            Error::UnprocessableEntity { errors } => debug!("Validation errors: {:?}", errors),
+            Error::Anyhow(e) => error!("Internal server error: {}", e),
+        }
 
         let body = match self {
             Error::UnprocessableEntity { errors } => Json(json!({
