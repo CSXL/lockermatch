@@ -1,4 +1,3 @@
-use anyhow::Context;
 use backend::http;
 
 #[tokio::main]

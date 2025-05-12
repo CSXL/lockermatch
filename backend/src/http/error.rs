@@ -1,8 +1,13 @@
 // TODO: finish error implementation
 
-use axum::http::StatusCode;
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Json},
+};
+use serde_json::json;
 use std::borrow::Cow;
 use std::collections::HashMap;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Return `401 Unauthorized`
@@ -59,5 +64,22 @@ impl Error {
             Self::UnprocessableEntity { .. } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Anyhow(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> axum::response::Response {
+        let status = self.status_code();
+
+        let body = match self {
+            Error::UnprocessableEntity { errors } => Json(json!({
+                "errors": errors
+            })),
+            _ => Json(json!({
+                "error": self.to_string()
+            })),
+        };
+
+        (status, body).into_response()
     }
 }
