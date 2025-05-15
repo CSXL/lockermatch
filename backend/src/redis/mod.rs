@@ -1,5 +1,5 @@
 use log::{debug, info};
-use redis::{Client, Connection, RedisResult};
+use redis::{Client, Connection};
 use std::env;
 use std::sync::Arc;
 use tokio::sync::Mutex;

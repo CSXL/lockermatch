@@ -71,7 +71,7 @@ pub async fn hash_example(redis: &RedisPool) -> Result<(), Error> {
 
     // Store multiple fields in a hash
     redis
-        .execute_command(
+        .execute_command::<()>(
             &mut redis::cmd("HSET")
                 .arg(hash_key)
                 .arg("name")
@@ -105,7 +105,7 @@ pub async fn hash_example(redis: &RedisPool) -> Result<(), Error> {
 
     // Clean up
     redis
-        .execute_command(&mut redis::cmd("DEL").arg(hash_key))
+        .execute_command::<()>(&mut redis::cmd("DEL").arg(hash_key))
         .await?;
 
     Ok(())
