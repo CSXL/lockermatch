@@ -6,3 +6,9 @@ Cargo.lock
 
 # Log files
 logs/
+
+# Redis
+.env
+.env.local
+.env.development
+.env.production
