@@ -55,13 +55,9 @@ pub async fn user_example(redis: &RedisPool) -> Result<(), Error> {
 pub async fn counter_example(redis: &RedisPool) -> Result<(), Error> {
     let counter_key = "visitor_count";
     
-    // Increment counter
-    let mut conn = redis.get_connection()?;
-    let count: i64 = redis::cmd("INCR")
-        .arg(counter_key)
-        .query(&mut conn)
-        .map_err(Error::from)?;
-        
+    // Increment counter using execute_command for direct command execution
+    let count: i64 = redis.execute_command(&mut redis::cmd("INCR").arg(counter_key)).await?;
+
     info!("Visitor count: {}", count);
     
     Ok(())
@@ -71,48 +67,34 @@ pub async fn counter_example(redis: &RedisPool) -> Result<(), Error> {
 pub async fn hash_example(redis: &RedisPool) -> Result<(), Error> {
     let hash_key = "product:12345";
     
-    // Get a Redis connection
-    let mut conn = redis.get_connection()?;
-    
     // Store multiple fields in a hash
-    redis::cmd("HSET")
+    redis.execute_command(&mut redis::cmd("HSET")
         .arg(hash_key)
         .arg("name").arg("Awesome Product")
         .arg("price").arg(99.99)
-        .arg("stock").arg(42)
-        .query::<()>(&mut conn)
-        .map_err(Error::from)?;
+        .arg("stock").arg(42)).await?;
         
     info!("Stored product data in Redis hash");
     
     // Get specific fields
-    let name: String = redis::cmd("HGET")
+    let name: String = redis.execute_command(&mut redis::cmd("HGET")
         .arg(hash_key)
-        .arg("name")
-        .query(&mut conn)
-        .map_err(Error::from)?;
+        .arg("name")).await?;
         
-    let stock: i64 = redis::cmd("HGET")
+    let stock: i64 = redis.execute_command(&mut redis::cmd("HGET")
         .arg(hash_key)
-        .arg("stock")
-        .query(&mut conn)
-        .map_err(Error::from)?;
+        .arg("stock")).await?;
         
     info!("Product '{}' has {} items in stock", name, stock);
     
     // Get all fields
-    let hash_data: std::collections::HashMap<String, String> = redis::cmd("HGETALL")
-        .arg(hash_key)
-        .query(&mut conn)
-        .map_err(Error::from)?;
+    let hash_data: std::collections::HashMap<String, String> = redis.execute_command(
+        &mut redis::cmd("HGETALL").arg(hash_key)).await?;
         
     debug!("All product data: {:?}", hash_data);
     
     // Clean up
-    redis::cmd("DEL")
-        .arg(hash_key)
-        .query::<()>(&mut conn)
-        .map_err(Error::from)?;
+    redis.execute_command(&mut redis::cmd("DEL").arg(hash_key)).await?;
         
     Ok(())
 } 

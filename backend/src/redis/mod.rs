@@ -1,6 +1,8 @@
 use log::{debug, info};
 use redis::{Client, Connection, RedisResult};
 use std::env;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::http::Error;
 
@@ -34,11 +36,12 @@ impl Default for RedisConfig {
     }
 }
 
-/// Redis connection pool
+/// Redis connection pool with shared connection
 #[derive(Clone)]
 pub struct RedisPool {
     client: Client,
     config: RedisConfig,
+    connection: Arc<Mutex<Option<Connection>>>,
 }
 
 impl std::fmt::Debug for RedisPool {
@@ -46,6 +49,7 @@ impl std::fmt::Debug for RedisPool {
         f.debug_struct("RedisPool")
             .field("client", &self.client)
             .field("config", &self.config)
+            .field("connection", &"<Redis Connection>")
             .finish()
     }
 }
@@ -60,12 +64,12 @@ impl RedisPool {
         Ok(Self {
             client,
             config,
+            connection: Arc::new(Mutex::new(None)),
         })
     }
 
-    /// Get a Redis connection from the pool
-    pub fn get_connection(&self) -> Result<Connection, Error> {
-        // We'll just get a new connection each time
+    /// Create a new authenticated connection to Redis
+    fn create_connection(&self) -> Result<Connection, Error> {
         debug!("Creating new Redis connection");
         let mut conn = self
             .client
@@ -94,24 +98,71 @@ impl RedisPool {
         Ok(conn)
     }
 
-    /// Initialize the Redis connection pool
-    pub async fn init() -> Result<Self, Error> {
-        let config = RedisConfig::default();
-        info!("Initializing Redis connection pool with URL: {}", config.url);
-        let pool = Self::new(config)?;
-        
-        // Test the connection
-        let mut conn = pool.get_connection()?;
-        let ping: RedisResult<String> = redis::cmd("PING").query(&mut conn);
-        
-        match ping {
-            Ok(response) => {
-                info!("Redis connection test successful: {}", response);
-                Ok(pool)
+    /// Get a Redis connection from the pool or create a new one
+    pub async fn get_connection(&self) -> Result<Connection, Error> {
+        let mut conn_guard = self.connection.lock().await;
+
+        // Check if we already have a connection
+        match conn_guard.take() {
+            Some(mut conn) => {
+                // Test if the connection is still valid with a PING
+                let ping_result: Result<String, redis::RedisError> = redis::cmd("PING").query(&mut conn);
+
+                if ping_result.is_ok() {
+                    debug!("Reusing existing Redis connection");
+                    // Return the connection for use
+                    Ok(conn)
+                } else {
+                    debug!("Existing connection is invalid, creating new one");
+                    // Connection is not valid, create a new one
+                    let conn = self.create_connection()?;
+                    Ok(conn)
+                }
             }
-            Err(e) => Err(Error::RedisConnection(format!("Redis connection test failed: {}", e))),
+            None => {
+                // No connection exists, create a new one
+                debug!("No existing connection, creating new one");
+                let conn = self.create_connection()?;
+                Ok(conn)
+            }
         }
     }
+
+    /// Initialize the Redis connection pool and establish an initial connection
+pub async fn init() -> Result<Self, Error> {
+    let config = RedisConfig::default();
+    info!("Initializing Redis connection pool with URL: {}", config.url);
+    let pool = Self::new(config)?;
+
+    // Test the connection to make sure Redis is available
+    {
+        let mut conn = pool.create_connection()?;
+
+        // Test the connection with PING
+        let ping_result = redis::cmd("PING").query::<String>(&mut conn)
+            .map_err(|e| Error::RedisConnection(format!("Redis connection test failed: {}", e)))?;
+
+        info!("Redis connection test successful: {}", ping_result);
+
+        // Store the initial connection in the pool
+        let mut conn_guard = pool.connection.lock().await;
+        *conn_guard = Some(conn);
+    }
+
+    Ok(pool)
+}
+
+    /// Execute a Redis command with automatic connection management
+pub async fn execute_command<T: redis::FromRedisValue>(&self, cmd: &mut redis::Cmd) -> Result<T, Error> {
+    // Get a connection from the pool
+    let mut conn = self.get_connection().await?;
+    // Execute the command
+    let result = cmd.query(&mut conn).map_err(Error::from)?;
+    // Return the connection to the pool
+    let mut conn_guard = self.connection.lock().await;
+    *conn_guard = Some(conn);
+    Ok(result)
+}
 }
 
 /// Helper trait to simplify Redis operations
@@ -141,13 +192,11 @@ pub trait RedisOperations {
 #[async_trait::async_trait]
 impl RedisOperations for RedisPool {
     async fn get<T: redis::FromRedisValue + Send>(&self, key: &str) -> Result<T, Error> {
-        let mut conn = self.get_connection()?;
-        redis::cmd("GET").arg(key).query(&mut conn).map_err(Error::from)
+        self.execute_command(&mut redis::cmd("GET").arg(key)).await
     }
     
     async fn set<T: redis::ToRedisArgs + Send + Sync>(&self, key: &str, value: T) -> Result<(), Error> {
-        let mut conn = self.get_connection()?;
-        redis::cmd("SET").arg(key).arg(value).query(&mut conn).map_err(Error::from)
+        self.execute_command(&mut redis::cmd("SET").arg(key).arg(value)).await
     }
     
     async fn set_ex<T: redis::ToRedisArgs + Send + Sync>(
@@ -156,17 +205,14 @@ impl RedisOperations for RedisPool {
         value: T,
         ttl_seconds: u64,
     ) -> Result<(), Error> {
-        let mut conn = self.get_connection()?;
-        redis::cmd("SETEX").arg(key).arg(ttl_seconds).arg(value).query(&mut conn).map_err(Error::from)
+        self.execute_command(&mut redis::cmd("SETEX").arg(key).arg(ttl_seconds).arg(value)).await
     }
     
     async fn del(&self, key: &str) -> Result<(), Error> {
-        let mut conn = self.get_connection()?;
-        redis::cmd("DEL").arg(key).query(&mut conn).map_err(Error::from)
+        self.execute_command(&mut redis::cmd("DEL").arg(key)).await
     }
     
     async fn exists(&self, key: &str) -> Result<bool, Error> {
-        let mut conn = self.get_connection()?;
-        redis::cmd("EXISTS").arg(key).query(&mut conn).map_err(Error::from)
+        self.execute_command(&mut redis::cmd("EXISTS").arg(key)).await
     }
 } 

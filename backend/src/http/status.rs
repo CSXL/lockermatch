@@ -84,12 +84,10 @@ pub async fn redis_status(
     // Store the current timestamp in Redis
     let key = "last_status_check";
     redis_pool.set(key, &timestamp).await?;
+
     // Retrieve and increment the hit counter
-    let mut conn = redis_pool.get_connection()?;
-    let hits: i64 = redis::cmd("INCR")
-        .arg("status_hits")
-        .query(&mut conn)
-        .map_err(Error::from)?;
+    let hits: i64 = redis_pool.execute_command(&mut redis::cmd("INCR").arg("status_hits")).await?;
+
     info!("Redis status check successful at {} (hit count: {})", timestamp, hits);
 
     let response = json!({
