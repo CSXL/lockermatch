@@ -97,9 +97,10 @@ impl Error {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound | Self::RedisKeyNotFound(_) => StatusCode::NOT_FOUND,
             Self::UnprocessableEntity { .. } => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::RedisConnection(_) | Self::RedisCommand(_) | Self::RedisParseError(_) | Self::Anyhow(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            Self::RedisConnection(_)
+            | Self::RedisCommand(_)
+            | Self::RedisParseError(_)
+            | Self::Anyhow(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

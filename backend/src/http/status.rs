@@ -21,8 +21,7 @@ pub struct StatusParams {
 /// Create the base router without Redis functionality
 pub fn base_router() -> Router {
     debug!("Setting up base status routes");
-    Router::new()
-        .route("/status", get(status))
+    Router::new().route("/status", get(status))
 }
 
 /// Create a router with Redis state
@@ -86,9 +85,14 @@ pub async fn redis_status(
     redis_pool.set(key, &timestamp).await?;
 
     // Retrieve and increment the hit counter
-    let hits: i64 = redis_pool.execute_command(&mut redis::cmd("INCR").arg("status_hits")).await?;
+    let hits: i64 = redis_pool
+        .execute_command(&mut redis::cmd("INCR").arg("status_hits"))
+        .await?;
 
-    info!("Redis status check successful at {} (hit count: {})", timestamp, hits);
+    info!(
+        "Redis status check successful at {} (hit count: {})",
+        timestamp, hits
+    );
 
     let response = json!({
         "status": "ok",
