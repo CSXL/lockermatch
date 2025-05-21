@@ -71,7 +71,7 @@ async fn counter_example(redis: &RedisPool) -> Result<(), Error> {
 
     // Clean up
     redis.del(counter_key).await?;
-    
+
     Ok(())
 }
 
