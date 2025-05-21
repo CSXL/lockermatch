@@ -6,8 +6,6 @@ use tokio::sync::Mutex;
 
 use crate::http::Error;
 
-pub mod examples;
-
 /// Redis connection configuration
 #[derive(Debug, Clone)]
 pub struct RedisConfig {
