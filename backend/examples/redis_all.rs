@@ -69,6 +69,9 @@ async fn counter_example(redis: &RedisPool) -> Result<(), Error> {
 
     info!("Visitor count: {}", count);
 
+    // Clean up
+    redis.del(counter_key).await?;
+    
     Ok(())
 }
 
